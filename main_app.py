@@ -1,12 +1,18 @@
-# main_app.py (Updated with Animation Fix)
+# main_app.py (Updated with new Update Checker)
 
 import customtkinter
 import threading
 import os
 import math
+import json
+import webbrowser
+from urllib import request
 from tkinter import filedialog
 from PIL import Image, ImageTk
 from scraper_engine import run_scraper, load_processed_addresses
+
+# --- Version Number for the entire application ---
+APP_VERSION = "1.0.0"
 
 # Set appearance and color theme for the application.
 customtkinter.set_appearance_mode("System")
@@ -17,8 +23,12 @@ class App(customtkinter.CTk):
         super().__init__()
 
         # --- Window Configuration ---
-        self.title("Google Maps Lead Scraper")
+        self.title(f"Google Maps Lead Scraper - v{APP_VERSION}")
         self.geometry(f"1000x700")
+
+        # --- App Name and Version Attributes ---
+        self.APP_NAME = "Gmaps Scraper"
+        self.APP_VERSION = APP_VERSION
 
         # --- Layout Configuration ---
         self.grid_columnconfigure(1, weight=1)
@@ -80,28 +90,27 @@ class App(customtkinter.CTk):
         self.animation_state = "idle"
         self.angle = 0
         self.setup_animation()
-        # --- FIX: Delay the first animation call to allow the window to render ---
         self.after(100, self.animate)
         
         self.scraper_thread = None
         self.stop_event = threading.Event()
 
+        # --- Start the update check in a separate thread on launch ---
+        threading.Thread(target=self.check_for_updates, daemon=True).start()
+
     def setup_animation(self):
         """Loads images but does not resize them yet."""
         try:
-            # Load the original PIL images
             self.earth_pil_image = Image.open("earth.png")
             self.robot_orbit_pil_image = Image.open("robot.png")
             self.robot_idle_pil_image = Image.open("robot_idle.png")
             self.robot_success_pil_image = Image.open("robot_success.png")
             
-            # These will hold the PhotoImage objects after resizing
             self.earth_tk_image = None
             self.robot_orbit_tk_image = None
             self.robot_idle_tk_image = None
             self.robot_success_tk_image = None
 
-            # Create the canvas items, they will be configured in the animate() loop
             self.earth_id = self.animation_canvas.create_image(0, 0, anchor="center", state='hidden')
             self.robot_orbit_id = self.animation_canvas.create_image(0, 0, anchor="center", state='hidden')
             self.robot_idle_id = self.animation_canvas.create_image(0, 0, anchor="center", state='hidden')
@@ -118,31 +127,25 @@ class App(customtkinter.CTk):
         center_x = canvas_width / 2
         center_y = canvas_height / 2
 
-        # --- FIX: Dynamic resizing based on canvas size ---
-        # Ensure the canvas has a valid size before doing calculations
         if canvas_width < 50 or canvas_height < 50:
-            self.after(100, self.animate) # If not ready, check again shortly
+            self.after(100, self.animate)
             return
 
-        # Calculate dynamic sizes
         earth_size = int(canvas_height * 0.4)
         robot_orbit_size = int(canvas_height * 0.25)
         robot_idle_size = int(canvas_height * 0.3)
         robot_success_size = int(canvas_height * 0.5)
 
-        # Create resized PhotoImage objects
         self.earth_tk_image = ImageTk.PhotoImage(self.earth_pil_image.resize((earth_size, earth_size), Image.Resampling.LANCZOS))
         self.robot_orbit_tk_image = ImageTk.PhotoImage(self.robot_orbit_pil_image.resize((robot_orbit_size, robot_orbit_size), Image.Resampling.LANCZOS))
         self.robot_idle_tk_image = ImageTk.PhotoImage(self.robot_idle_pil_image.resize((robot_idle_size, robot_idle_size), Image.Resampling.LANCZOS))
         self.robot_success_tk_image = ImageTk.PhotoImage(self.robot_success_pil_image.resize((robot_success_size, robot_success_size), Image.Resampling.LANCZOS))
 
-        # Update the canvas items with the newly sized images
         self.animation_canvas.itemconfig(self.earth_id, image=self.earth_tk_image)
         self.animation_canvas.itemconfig(self.robot_orbit_id, image=self.robot_orbit_tk_image)
         self.animation_canvas.itemconfig(self.robot_idle_id, image=self.robot_idle_tk_image)
         self.animation_canvas.itemconfig(self.robot_success_id, image=self.robot_success_tk_image)
 
-        # --- State Machine for Animation ---
         if self.animation_state == 'idle':
             self.animation_canvas.itemconfig(self.robot_orbit_id, state='hidden')
             self.animation_canvas.itemconfig(self.robot_success_id, state='hidden')
@@ -164,7 +167,7 @@ class App(customtkinter.CTk):
             robot_y = center_y + radius_y * math.sin(self.angle)
             self.animation_canvas.coords(self.robot_orbit_id, robot_x, robot_y)
             self.angle += 0.02
-            self.after(33, self.animate) # Continue the loop
+            self.after(33, self.animate)
 
         elif self.animation_state == 'finished':
             self.animation_canvas.itemconfig(self.robot_orbit_id, state='hidden')
@@ -239,6 +242,47 @@ class App(customtkinter.CTk):
             self.animate()
             self.start_button.configure(state="normal")
             self.stop_button.configure(state="disabled")
+            
+    # --- NEW: Update checking functions ---
+    def check_for_updates(self):
+        """
+        Checks for new releases on GitHub using the public API.
+        """
+        self.update_log("Checking for updates...")
+        try:
+            # The URL for the latest release API for your repository
+            API_URL = "https://api.github.com/repos/aimjv-abbxy/google-maps-scraper-app/releases/latest"
+            
+            # Make the request to the GitHub API
+            with request.urlopen(API_URL) as response:
+                data = json.loads(response.read().decode())
+            
+            # Get the latest version from the 'tag_name' field (e.g., "v1.1.0")
+            latest_version = data['tag_name']
+            
+            # Compare with the current app version
+            if latest_version.lstrip('v') > self.APP_VERSION:
+                self.update_log(f"New version found: {latest_version}")
+                self.prompt_for_update(data['html_url'])
+            else:
+                self.update_log("You are running the latest version.")
+
+        except Exception as e:
+            self.update_log(f"Could not check for updates: {e}")
+
+    def prompt_for_update(self, download_url):
+        """
+        Creates a popup window to ask the user if they want to update.
+        """
+        dialog = customtkinter.CTkInputDialog(
+            text=f"A new version is available!\n\nWould you like to go to the download page?",
+            title="Update Found"
+        )
+        user_input = dialog.get_input()
+        if user_input is not None: # If the user clicked OK or typed something
+            self.update_log("Opening download page...")
+            webbrowser.open(download_url)
+
 
 if __name__ == "__main__":
     app = App()
