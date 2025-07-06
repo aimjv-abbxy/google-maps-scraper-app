@@ -2,9 +2,6 @@
 
 A sophisticated desktop application built with Python to automate the process of scraping business lead data from Google Maps. This tool provides a user-friendly interface to generate targeted lead lists for any keyword or location worldwide.
 
-![placeholder for a gif of the app in action](https://placehold.co/800x400?text=Your+App+In+Action.gif)
-*(Suggestion: After the app is complete, you can record a short GIF of it working and replace the placeholder link above!)*
-
 ---
 
 ### About The Project
@@ -44,18 +41,18 @@ Make sure you have Python and Git installed on your system.
 * [Python](https://www.python.org/downloads/)
 * [Git](https://git-scm.com/downloads)
 
-Installation
+#### Installation
 
-1.  Clone the repository:**
+1.  **Clone the repository:**
     ```sh
     git clone [https://github.com/aimjv-abbxy/google-maps-scraper-app.git](https://github.com/aimjv-abbxy/google-maps-scraper-app.git)
     ```
-2.  Navigate to the project directory:**
+2.  **Navigate to the project directory:**
     ```sh
     cd google-maps-scraper-app
     ```
-3.  Create and activate a virtual environment:**
-    On Windows:
+3.  **Create and activate a virtual environment:**
+    * On Windows:
         ```sh
         python -m venv venv
         .\venv\Scripts\activate
@@ -65,12 +62,12 @@ Installation
         python3 -m venv venv
         source venv/bin/activate
         ```
-4. Install the required packages:**
+4.  **Install the required packages:**
     ```sh
     pip install -r requirements.txt
     ```
 
-Usage
+### Usage
 
 1.  Make sure your virtual environment is activated.
 2.  Run the application with the following command:
@@ -81,6 +78,6 @@ Usage
 
 ---
 
-License
+### License
 
 Distributed under the MIT License. See `LICENSE` for more information.
