@@ -1,8 +1,9 @@
-# main_app.py (Updated with new Update Checker)
+# main_app.py (Updated with correct resource path handling)
 
 import customtkinter
 import threading
 import os
+import sys # <-- New import needed for the path helper
 import math
 import json
 import webbrowser
@@ -11,8 +12,19 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 from scraper_engine import run_scraper, load_processed_addresses
 
+# --- NEW: Helper function to find bundled assets ---
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 # --- Version Number for the entire application ---
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.2"
 
 # Set appearance and color theme for the application.
 customtkinter.set_appearance_mode("System")
@@ -99,12 +111,13 @@ class App(customtkinter.CTk):
         threading.Thread(target=self.check_for_updates, daemon=True).start()
 
     def setup_animation(self):
-        """Loads images but does not resize them yet."""
+        """Loads images using the resource_path helper function."""
         try:
-            self.earth_pil_image = Image.open("earth.png")
-            self.robot_orbit_pil_image = Image.open("robot.png")
-            self.robot_idle_pil_image = Image.open("robot_idle.png")
-            self.robot_success_pil_image = Image.open("robot_success.png")
+            # --- UPDATED: Use resource_path() for all images ---
+            self.earth_pil_image = Image.open(resource_path("earth.png"))
+            self.robot_orbit_pil_image = Image.open(resource_path("robot.png"))
+            self.robot_idle_pil_image = Image.open(resource_path("robot_idle.png"))
+            self.robot_success_pil_image = Image.open(resource_path("robot_success.png"))
             
             self.earth_tk_image = None
             self.robot_orbit_tk_image = None
@@ -131,38 +144,31 @@ class App(customtkinter.CTk):
             self.after(100, self.animate)
             return
 
-        earth_size = int(canvas_height * 0.4)
-        robot_orbit_size = int(canvas_height * 0.25)
-        robot_idle_size = int(canvas_height * 0.3)
-        robot_success_size = int(canvas_height * 0.5)
-
-        self.earth_tk_image = ImageTk.PhotoImage(self.earth_pil_image.resize((earth_size, earth_size), Image.Resampling.LANCZOS))
-        self.robot_orbit_tk_image = ImageTk.PhotoImage(self.robot_orbit_pil_image.resize((robot_orbit_size, robot_orbit_size), Image.Resampling.LANCZOS))
-        self.robot_idle_tk_image = ImageTk.PhotoImage(self.robot_idle_pil_image.resize((robot_idle_size, robot_idle_size), Image.Resampling.LANCZOS))
-        self.robot_success_tk_image = ImageTk.PhotoImage(self.robot_success_pil_image.resize((robot_success_size, robot_success_size), Image.Resampling.LANCZOS))
-
-        self.animation_canvas.itemconfig(self.earth_id, image=self.earth_tk_image)
-        self.animation_canvas.itemconfig(self.robot_orbit_id, image=self.robot_orbit_tk_image)
-        self.animation_canvas.itemconfig(self.robot_idle_id, image=self.robot_idle_tk_image)
-        self.animation_canvas.itemconfig(self.robot_success_id, image=self.robot_success_tk_image)
+        self.animation_canvas.itemconfig(self.earth_id, state='hidden')
+        self.animation_canvas.itemconfig(self.robot_orbit_id, state='hidden')
+        self.animation_canvas.itemconfig(self.robot_idle_id, state='hidden')
+        self.animation_canvas.itemconfig(self.robot_success_id, state='hidden')
 
         if self.animation_state == 'idle':
-            self.animation_canvas.itemconfig(self.robot_orbit_id, state='hidden')
-            self.animation_canvas.itemconfig(self.robot_success_id, state='hidden')
-            self.animation_canvas.itemconfig(self.earth_id, state='normal')
-            self.animation_canvas.itemconfig(self.robot_idle_id, state='normal')
+            earth_size = int(canvas_height * 0.4)
+            robot_size = int(canvas_height * 0.3)
+            self.earth_tk_image = ImageTk.PhotoImage(self.earth_pil_image.resize((earth_size, earth_size), Image.Resampling.LANCZOS))
+            self.robot_idle_tk_image = ImageTk.PhotoImage(self.robot_idle_pil_image.resize((robot_size, robot_size), Image.Resampling.LANCZOS))
+            self.animation_canvas.itemconfig(self.earth_id, image=self.earth_tk_image, state='normal')
+            self.animation_canvas.itemconfig(self.robot_idle_id, image=self.robot_idle_tk_image, state='normal')
             self.animation_canvas.coords(self.earth_id, center_x - (earth_size * 0.6), center_y)
             self.animation_canvas.coords(self.robot_idle_id, center_x + (earth_size * 0.7), center_y)
 
         elif self.animation_state == 'running':
-            self.animation_canvas.itemconfig(self.robot_idle_id, state='hidden')
-            self.animation_canvas.itemconfig(self.robot_success_id, state='hidden')
-            self.animation_canvas.itemconfig(self.earth_id, state='normal')
-            self.animation_canvas.itemconfig(self.robot_orbit_id, state='normal')
-            
+            earth_size = int(canvas_height * 0.4)
+            robot_size = int(canvas_height * 0.25)
+            self.earth_tk_image = ImageTk.PhotoImage(self.earth_pil_image.resize((earth_size, earth_size), Image.Resampling.LANCZOS))
+            self.robot_orbit_tk_image = ImageTk.PhotoImage(self.robot_orbit_pil_image.resize((robot_size, robot_size), Image.Resampling.LANCZOS))
+            self.animation_canvas.itemconfig(self.earth_id, image=self.earth_tk_image, state='normal')
+            self.animation_canvas.itemconfig(self.robot_orbit_id, image=self.robot_orbit_tk_image, state='normal')
             self.animation_canvas.coords(self.earth_id, center_x, center_y)
-            radius_x = (canvas_width / 2) - (robot_orbit_size)
-            radius_y = (canvas_height / 2) - (robot_orbit_size)
+            radius_x = (canvas_width / 2) - (robot_size)
+            radius_y = (canvas_height / 2) - (robot_size)
             robot_x = center_x + radius_x * math.cos(self.angle)
             robot_y = center_y + radius_y * math.sin(self.angle)
             self.animation_canvas.coords(self.robot_orbit_id, robot_x, robot_y)
@@ -170,10 +176,9 @@ class App(customtkinter.CTk):
             self.after(33, self.animate)
 
         elif self.animation_state == 'finished':
-            self.animation_canvas.itemconfig(self.robot_orbit_id, state='hidden')
-            self.animation_canvas.itemconfig(self.robot_idle_id, state='hidden')
-            self.animation_canvas.itemconfig(self.earth_id, state='hidden')
-            self.animation_canvas.itemconfig(self.robot_success_id, state='normal')
+            robot_size = int(canvas_height * 0.5)
+            self.robot_success_tk_image = ImageTk.PhotoImage(self.robot_success_pil_image.resize((robot_size, robot_size), Image.Resampling.LANCZOS))
+            self.animation_canvas.itemconfig(self.robot_success_id, image=self.robot_success_tk_image, state='normal')
             self.animation_canvas.coords(self.robot_success_id, center_x, center_y)
             
     def browse_folder(self):
@@ -192,10 +197,8 @@ class App(customtkinter.CTk):
         self.stop_button.configure(state="normal")
         self.log_textbox.delete("1.0", "end")
         self.stop_event.clear()
-        
         self.animation_state = 'running'
         self.animate()
-        
         self.scraper_thread = threading.Thread(target=self.run_scraper_logic)
         self.scraper_thread.daemon = True
         self.scraper_thread.start()
@@ -243,46 +246,32 @@ class App(customtkinter.CTk):
             self.start_button.configure(state="normal")
             self.stop_button.configure(state="disabled")
             
-    # --- NEW: Update checking functions ---
     def check_for_updates(self):
-        """
-        Checks for new releases on GitHub using the public API.
-        """
+        """Checks for new releases on GitHub using the public API."""
         self.update_log("Checking for updates...")
         try:
-            # The URL for the latest release API for your repository
             API_URL = "https://api.github.com/repos/aimjv-abbxy/google-maps-scraper-app/releases/latest"
-            
-            # Make the request to the GitHub API
             with request.urlopen(API_URL) as response:
                 data = json.loads(response.read().decode())
-            
-            # Get the latest version from the 'tag_name' field (e.g., "v1.1.0")
             latest_version = data['tag_name']
-            
-            # Compare with the current app version
             if latest_version.lstrip('v') > self.APP_VERSION:
                 self.update_log(f"New version found: {latest_version}")
                 self.prompt_for_update(data['html_url'])
             else:
                 self.update_log("You are running the latest version.")
-
         except Exception as e:
             self.update_log(f"Could not check for updates: {e}")
 
     def prompt_for_update(self, download_url):
-        """
-        Creates a popup window to ask the user if they want to update.
-        """
+        """Creates a popup window to ask the user if they want to update."""
         dialog = customtkinter.CTkInputDialog(
             text=f"A new version is available!\n\nWould you like to go to the download page?",
             title="Update Found"
         )
         user_input = dialog.get_input()
-        if user_input is not None: # If the user clicked OK or typed something
+        if user_input is not None:
             self.update_log("Opening download page...")
             webbrowser.open(download_url)
-
 
 if __name__ == "__main__":
     app = App()
